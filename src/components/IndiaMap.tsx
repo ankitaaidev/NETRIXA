@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import type { ThermalEvent } from '../types';
-import RiskBadge from './RiskBadge';
+import { useState } from "react";
+import type { ThermalEvent } from "../types";
+import RiskBadge from "./RiskBadge";
 
 // Approximate India bounding box: lat 8–37, lon 68–98
 // Map SVG viewport: 600x620
 const MAP_W = 600;
 const MAP_H = 620;
-const LAT_MIN = 6.5, LAT_MAX = 37.5;
-const LON_MIN = 67.5, LON_MAX = 98.5;
+const LAT_MIN = 6.5,
+  LAT_MAX = 37.5;
+const LON_MIN = 67.5,
+  LON_MAX = 98.5;
 
 function toXY(lat: number, lon: number) {
   const x = ((lon - LON_MIN) / (LON_MAX - LON_MIN)) * MAP_W;
@@ -16,10 +18,10 @@ function toXY(lat: number, lon: number) {
 }
 
 const RISK_COLORS: Record<string, string> = {
-  LOW: '#22c55e',
-  MEDIUM: '#f59e0b',
-  HIGH: '#f97316',
-  CRITICAL: '#ef4444',
+  LOW: "#22c55e",
+  MEDIUM: "#f59e0b",
+  HIGH: "#f97316",
+  CRITICAL: "#ef4444",
 };
 
 // Simplified India SVG path (approximate outline)
@@ -32,7 +34,11 @@ interface Props {
 }
 
 export default function IndiaMap({ events, onEventClick, selectedId }: Props) {
-  const [tooltip, setTooltip] = useState<{ event: ThermalEvent; x: number; y: number } | null>(null);
+  const [tooltip, setTooltip] = useState<{
+    event: ThermalEvent;
+    x: number;
+    y: number;
+  } | null>(null);
 
   return (
     <div className="relative w-full h-full bg-[#050a14] overflow-hidden">
@@ -42,7 +48,7 @@ export default function IndiaMap({ events, onEventClick, selectedId }: Props) {
       <svg
         viewBox={`0 0 ${MAP_W} ${MAP_H}`}
         className="w-full h-full"
-        style={{ maxHeight: '100%' }}
+        style={{ maxHeight: "100%" }}
       >
         {/* Ocean fill */}
         <rect width={MAP_W} height={MAP_H} fill="#050a14" />
@@ -56,22 +62,69 @@ export default function IndiaMap({ events, onEventClick, selectedId }: Props) {
         />
 
         {/* State border suggestions */}
-        <line x1="200" y1="150" x2="200" y2="420" stroke="#122035" strokeWidth="0.5" strokeDasharray="3,4" />
-        <line x1="250" y1="100" x2="280" y2="420" stroke="#122035" strokeWidth="0.5" strokeDasharray="3,4" />
-        <line x1="140" y1="220" x2="410" y2="220" stroke="#122035" strokeWidth="0.5" strokeDasharray="3,4" />
-        <line x1="140" y1="300" x2="410" y2="300" stroke="#122035" strokeWidth="0.5" strokeDasharray="3,4" />
+        <line
+          x1="200"
+          y1="150"
+          x2="200"
+          y2="420"
+          stroke="#122035"
+          strokeWidth="0.5"
+          strokeDasharray="3,4"
+        />
+        <line
+          x1="250"
+          y1="100"
+          x2="280"
+          y2="420"
+          stroke="#122035"
+          strokeWidth="0.5"
+          strokeDasharray="3,4"
+        />
+        <line
+          x1="140"
+          y1="220"
+          x2="410"
+          y2="220"
+          stroke="#122035"
+          strokeWidth="0.5"
+          strokeDasharray="3,4"
+        />
+        <line
+          x1="140"
+          y1="300"
+          x2="410"
+          y2="300"
+          stroke="#122035"
+          strokeWidth="0.5"
+          strokeDasharray="3,4"
+        />
 
         {/* Facility markers */}
         {[
-          { lat: 21.18, lon: 72.81 }, { lat: 22.57, lon: 88.36 }, { lat: 18.98, lon: 79.53 },
-          { lat: 20.31, lon: 85.86 }, { lat: 22.09, lon: 85.83 }, { lat: 17.69, lon: 83.22 },
-          { lat: 13.08, lon: 80.27 }, { lat: 19.08, lon: 72.88 }, { lat: 24.06, lon: 82.66 },
+          { lat: 21.18, lon: 72.81 },
+          { lat: 22.57, lon: 88.36 },
+          { lat: 18.98, lon: 79.53 },
+          { lat: 20.31, lon: 85.86 },
+          { lat: 22.09, lon: 85.83 },
+          { lat: 17.69, lon: 83.22 },
+          { lat: 13.08, lon: 80.27 },
+          { lat: 19.08, lon: 72.88 },
+          { lat: 24.06, lon: 82.66 },
           { lat: 22.42, lon: 70.05 },
         ].map((f, i) => {
           const { x, y } = toXY(f.lat, f.lon);
           return (
-            <rect key={i} x={x - 3} y={y - 3} width={6} height={6}
-              fill="#1e3a5f" stroke="#2d5a8e" strokeWidth="0.5" opacity="0.7" />
+            <rect
+              key={i}
+              x={x - 3}
+              y={y - 3}
+              width={6}
+              height={6}
+              fill="#1e3a5f"
+              stroke="#2d5a8e"
+              strokeWidth="0.5"
+              opacity="0.7"
+            />
           );
         })}
 
@@ -80,79 +133,160 @@ export default function IndiaMap({ events, onEventClick, selectedId }: Props) {
           const { x, y } = toXY(evt.latitude, evt.longitude);
           const color = RISK_COLORS[evt.riskLevel];
           const isSelected = selectedId === evt.id;
-          const isCritical = evt.riskLevel === 'CRITICAL';
+          const isCritical = evt.riskLevel === "CRITICAL";
 
           return (
-            <g key={evt.id} onClick={() => onEventClick(evt)} style={{ cursor: 'pointer' }}
+            <g
+              key={evt.id}
+              onClick={() => onEventClick(evt)}
+              style={{ cursor: "pointer" }}
               onMouseEnter={(e) => {
-                const rect = (e.currentTarget.closest('svg') as SVGSVGElement).getBoundingClientRect();
-                const svgEl = e.currentTarget.closest('svg') as SVGSVGElement;
+                const rect = (
+                  e.currentTarget.closest("svg") as SVGSVGElement
+                ).getBoundingClientRect();
+                const svgEl = e.currentTarget.closest("svg") as SVGSVGElement;
                 const pt = svgEl.createSVGPoint();
-                pt.x = e.clientX; pt.y = e.clientY;
-                const svgPt = pt.matrixTransform(svgEl.getScreenCTM()!.inverse());
+                pt.x = e.clientX;
+                pt.y = e.clientY;
+                const svgPt = pt.matrixTransform(
+                  svgEl.getScreenCTM()!.inverse(),
+                );
                 setTooltip({ event: evt, x: svgPt.x, y: svgPt.y });
               }}
-              onMouseLeave={() => setTooltip(null)}>
+              onMouseLeave={() => setTooltip(null)}
+            >
               {/* Pulse ring for critical */}
               {isCritical && (
-                <circle cx={x} cy={y} r={12} fill="none" stroke={color} strokeWidth="1"
-                  opacity="0.3" className="event-pulse-ring" />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={12}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1"
+                  opacity="0.3"
+                  className="event-pulse-ring"
+                />
               )}
               {/* Selection ring */}
               {isSelected && (
-                <circle cx={x} cy={y} r={10} fill="none" stroke={color} strokeWidth="1.5" opacity="0.8" />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={10}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="1.5"
+                  opacity="0.8"
+                />
               )}
               {/* Main dot */}
-              <circle cx={x} cy={y} r={isCritical ? 6 : 4.5}
-                fill={color} fillOpacity={0.9}
-                stroke={isSelected ? '#fff' : color}
+              <circle
+                cx={x}
+                cy={y}
+                r={isCritical ? 6 : 4.5}
+                fill={color}
+                fillOpacity={0.9}
+                stroke={isSelected ? "#fff" : color}
                 strokeWidth={isSelected ? 1.5 : 0.5}
               />
               {/* Inner dot */}
-              <circle cx={x} cy={y} r={isCritical ? 2.5 : 1.5} fill="#fff" fillOpacity="0.8" />
+              <circle
+                cx={x}
+                cy={y}
+                r={isCritical ? 2.5 : 1.5}
+                fill="#fff"
+                fillOpacity="0.8"
+              />
             </g>
           );
         })}
 
         {/* Tooltip */}
-        {tooltip && (() => {
-          const { event: evt, x, y } = tooltip;
-          const color = RISK_COLORS[evt.riskLevel];
-          const tw = 180, th = 64;
-          const tx = Math.min(x + 12, MAP_W - tw - 8);
-          const ty = Math.max(y - 32, 4);
-          return (
-            <g pointerEvents="none">
-              <rect x={tx} y={ty} width={tw} height={th} rx="2"
-                fill="#0d1f3c" stroke="#1e3a5f" strokeWidth="0.5" />
-              <rect x={tx} y={ty} width={tw} height={2} rx="1" fill={color} />
-              <text x={tx + 10} y={ty + 18} fill="#e2eaf5" fontSize="10" fontFamily="'JetBrains Mono'" fontWeight="500">{evt.eventId}</text>
-              <text x={tx + 10} y={ty + 32} fill="#7a9cc4" fontSize="9" fontFamily="Inter">{evt.classification.slice(0, 28)}</text>
-              <text x={tx + 10} y={ty + 50} fill={color} fontSize="9" fontFamily="'JetBrains Mono'" fontWeight="500">
-                {evt.riskLevel} · Score {evt.riskScore}
-              </text>
-            </g>
-          );
-        })()}
+        {tooltip &&
+          (() => {
+            const { event: evt, x, y } = tooltip;
+            const color = RISK_COLORS[evt.riskLevel];
+            const tw = 180,
+              th = 64;
+            const tx = Math.min(x + 12, MAP_W - tw - 8);
+            const ty = Math.max(y - 32, 4);
+            return (
+              <g pointerEvents="none">
+                <rect
+                  x={tx}
+                  y={ty}
+                  width={tw}
+                  height={th}
+                  rx="2"
+                  fill="#0d1f3c"
+                  stroke="#1e3a5f"
+                  strokeWidth="0.5"
+                />
+                <rect x={tx} y={ty} width={tw} height={2} rx="1" fill={color} />
+                <text
+                  x={tx + 10}
+                  y={ty + 18}
+                  fill="#e2eaf5"
+                  fontSize="10"
+                  fontFamily="'JetBrains Mono'"
+                  fontWeight="500"
+                >
+                  {evt.eventId}
+                </text>
+                <text
+                  x={tx + 10}
+                  y={ty + 32}
+                  fill="#7a9cc4"
+                  fontSize="9"
+                  fontFamily="Inter"
+                >
+                  {evt.classification.slice(0, 28)}
+                </text>
+                <text
+                  x={tx + 10}
+                  y={ty + 50}
+                  fill={color}
+                  fontSize="9"
+                  fontFamily="'JetBrains Mono'"
+                  fontWeight="500"
+                >
+                  {evt.riskLevel} · Score {evt.riskScore}
+                </text>
+              </g>
+            );
+          })()}
       </svg>
 
       {/* Legend */}
       <div className="absolute bottom-3 left-3 glass px-3 py-2 flex items-center gap-4">
-        {(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const).map((r) => (
+        {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((r) => (
           <div key={r} className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full" style={{ background: RISK_COLORS[r] }} />
-            <span className="font-mono-data text-[10px] tracking-widest" style={{ color: RISK_COLORS[r] }}>{r}</span>
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ background: RISK_COLORS[r] }}
+            />
+            <span
+              className="font-mono-data text-[10px] tracking-widest"
+              style={{ color: RISK_COLORS[r] }}
+            >
+              {r}
+            </span>
           </div>
         ))}
         <div className="flex items-center gap-1.5 ml-2 border-l border-[#1e3a5f] pl-3">
           <span className="w-3 h-3 border border-[#2d5a8e] bg-[#1e3a5f] inline-block" />
-          <span className="font-mono-data text-[10px] text-[#3d6490] tracking-widest">FACILITY</span>
+          <span className="font-mono-data text-[10px] text-[#3d6490] tracking-widest">
+            FACILITY
+          </span>
         </div>
       </div>
 
       {/* Event count */}
       <div className="absolute top-3 right-3 glass px-3 py-1.5">
-        <span className="font-mono-data text-[10px] text-[#7a9cc4] tracking-widest">{events.length} DETECTIONS</span>
+        <span className="font-mono-data text-[10px] text-[#7a9cc4] tracking-widest">
+          {events.length} DETECTIONS
+        </span>
       </div>
     </div>
   );
