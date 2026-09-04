@@ -1,0 +1,10 @@
+{
+  "description": "Create stunning, professional websites effortlessly with customizable templates designed for businesses and individuals seeking an online presence.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
