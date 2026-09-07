@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Satellite, Clock, Building2, Layers,
@@ -10,6 +10,8 @@ import {
 } from 'recharts';
 import RiskBadge from '../components/RiskBadge';
 import { ALL_EVENTS } from '../data/mockData';
+import { api } from '../services/api';
+import type { ThermalEvent } from '../types';
 
 type Tab = 'overview' | 'thermal' | 'history' | 'satellite' | 'ai' | 'explanation';
 
@@ -47,12 +49,45 @@ export default function EventDetail() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('overview');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [event, setEvent] = useState<ThermalEvent | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const event = ALL_EVENTS.find((e) => e.id === eventId);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    const fallback = ALL_EVENTS.find((candidate) => candidate.eventId === eventId);
+    void api.getEvent(eventId || '').then((nextEvent) => {
+      if (active) { setEvent(nextEvent); setLoading(false); }
+    }).catch((requestError) => {
+      if (!active) return;
+      if (fallback) {
+        setEvent({ ...fallback, id: fallback.eventId });
+        setError('BACKEND UNAVAILABLE · DEMO DATA ACTIVE');
+      } else {
+        setEvent(null);
+        setError(requestError instanceof Error ? requestError.message : 'Event could not be loaded.');
+      }
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, [eventId]);
+
+  const submitFeedback = (label: string) => {
+    setFeedback(label);
+    if (!event) return;
+    const decision = label === 'Confirmed' ? 'CONFIRMED' : label === 'False Positive' ? 'FALSE_POSITIVE' : label === 'Needs Investigation' ? 'NEEDS_REVIEW' : null;
+    if (decision) void api.submitFeedback(event.eventId, decision).catch(() => setError('FEEDBACK COULD NOT BE RECORDED'));
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-full text-cyan-400 font-mono-data text-sm">LOADING EVENT INVESTIGATION...</div>;
+  }
   if (!event) {
     return (
       <div className="flex items-center justify-center h-full text-[#3d6490] font-mono-data text-sm">
-        EVENT NOT FOUND
+        EVENT NOT FOUND · {error}
       </div>
     );
   }
@@ -66,6 +101,7 @@ export default function EventDetail() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {error && <div className="px-5 py-2 border-b border-amber-800/40 bg-amber-950/20 font-mono-data text-[10px] text-amber-400">{error}</div>}
       {/* Header */}
       <div className="px-5 py-4 border-b border-[#1e3a5f] flex-shrink-0"
         style={{ borderTopColor: riskColor, borderTopWidth: 2 }}>
@@ -214,7 +250,7 @@ export default function EventDetail() {
                 <div className="grid grid-cols-2 gap-1.5">
                   {['Confirmed', 'False Positive', 'Needs Investigation', 'Unknown'].map((f) => (
                     <button key={f}
-                      onClick={() => setFeedback(f)}
+                      onClick={() => submitFeedback(f)}
                       className={`py-1.5 text-[10px] font-mono-data tracking-wide border transition-colors ${
                         feedback === f
                           ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'

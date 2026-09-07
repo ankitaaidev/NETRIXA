@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Building2 } from 'lucide-react';
 import { FACILITIES } from '../data/mockData';
+import { api } from '../services/api';
+import type { Facility } from '../types';
 
 const STATUS_COLOR: Record<string, string> = {
   NORMAL: '#22c55e',
@@ -11,8 +13,21 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function Facilities() {
   const [selected, setSelected] = useState<string | null>(null);
+  const [facilities, setFacilities] = useState<Facility[]>(FACILITIES);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const facility = FACILITIES.find((f) => f.id === selected);
+  useEffect(() => {
+    let active = true;
+    void api.getFacilities().then((nextFacilities) => {
+      if (active) { setFacilities(nextFacilities); setLoading(false); }
+    }).catch(() => {
+      if (active) { setError(true); setLoading(false); }
+    });
+    return () => { active = false; };
+  }, []);
+
+  const facility = facilities.find((f) => f.facilityId === selected);
 
   return (
     <div className="flex h-full">
@@ -20,8 +35,10 @@ export default function Facilities() {
       <div className={`flex flex-col ${selected ? 'w-2/3' : 'flex-1'} border-r border-[#1e3a5f] overflow-auto transition-all`}>
         <div className="px-5 py-4 border-b border-[#1e3a5f] flex-shrink-0">
           <div className="font-display font-700 text-xl tracking-[0.1em] text-[#e2eaf5]">INDUSTRIAL FACILITIES</div>
-          <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest">{FACILITIES.length} REGISTERED FACILITIES · INDIA</div>
+          <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest">{facilities.length} REGISTERED FACILITIES · INDIA</div>
         </div>
+        {error && <div className="px-5 py-2 font-mono-data text-[10px] text-amber-400">BACKEND UNAVAILABLE · DEMO DATA ACTIVE</div>}
+        {loading && <div className="px-5 py-2 font-mono-data text-[10px] text-cyan-400">SYNCING FACILITIES...</div>}
         <table className="w-full border-collapse text-xs">
           <thead className="sticky top-0 bg-[#050a14] z-10">
             <tr className="border-b border-[#1e3a5f]">
@@ -31,10 +48,10 @@ export default function Facilities() {
             </tr>
           </thead>
           <tbody>
-            {FACILITIES.map((f) => (
-              <tr key={f.id}
-                className={`data-row border-b border-[#0d1f3c] cursor-pointer ${selected === f.id ? 'bg-cyan-500/5' : ''}`}
-                onClick={() => setSelected(selected === f.id ? null : f.id)}>
+            {facilities.map((f) => (
+              <tr key={f.facilityId}
+                className={`data-row border-b border-[#0d1f3c] cursor-pointer ${selected === f.facilityId ? 'bg-cyan-500/5' : ''}`}
+                onClick={() => setSelected(selected === f.facilityId ? null : f.facilityId)}>
                 <td className="px-3 py-2.5 font-display font-500 text-[11px] text-[#e2eaf5] whitespace-nowrap">{f.name}</td>
                 <td className="px-3 py-2.5 font-mono-data text-[10px] text-[#7a9cc4] whitespace-nowrap">{f.facilityType}</td>
                 <td className="px-3 py-2.5 font-mono-data text-[10px] text-[#7a9cc4] whitespace-nowrap">{f.state}</td>

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, Clock } from 'lucide-react';
 import RiskBadge from '../components/RiskBadge';
 import { ALERTS } from '../data/mockData';
+import { api } from '../services/api';
 import type { Alert } from '../types';
 
 const SEV_COLOR: Record<string, string> = {
@@ -15,13 +16,27 @@ const SEV_COLOR: Record<string, string> = {
 export default function Alerts() {
   const navigate = useNavigate();
   const [alerts, setAlerts] = useState<Alert[]>(ALERTS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED'>('ALL');
+
+  useEffect(() => {
+    let active = true;
+    void api.getAlerts().then((nextAlerts) => {
+      if (active) { setAlerts(nextAlerts); setLoading(false); }
+    }).catch(() => {
+      if (active) { setError(true); setLoading(false); }
+    });
+    return () => { active = false; };
+  }, []);
 
   const filtered = alerts.filter((a) => filter === 'ALL' || a.status === filter);
   const active = alerts.filter((a) => a.status === 'ACTIVE').length;
 
   const acknowledge = (id: string) => {
-    setAlerts((prev) => prev.map((a) => a.id === id && a.status === 'ACTIVE' ? { ...a, status: 'ACKNOWLEDGED' } : a));
+    void api.resolveAlert(id).then((resolved) => {
+      setAlerts((prev) => prev.map((alert) => alert.id === id ? resolved : alert));
+    }).catch(() => setError(true));
   };
 
   return (
@@ -38,6 +53,7 @@ export default function Alerts() {
           <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest">PRIORITY THERMAL ANOMALY NOTIFICATIONS</div>
         </div>
       </div>
+      {error && <div className="px-5 py-2 border-b border-amber-800/40 bg-amber-950/20 font-mono-data text-[10px] text-amber-400">BACKEND UNAVAILABLE · DEMO DATA ACTIVE</div>}
 
       {/* Filter tabs */}
       <div className="flex border-b border-[#1e3a5f] flex-shrink-0">
@@ -59,6 +75,7 @@ export default function Alerts() {
 
       {/* Alerts */}
       <div className="flex-1 overflow-auto p-5 space-y-3">
+        {loading && <div className="font-mono-data text-[10px] text-cyan-400">SYNCING ALERTS...</div>}
         {filtered.length === 0 && (
           <div className="flex items-center justify-center h-32 text-[#3d6490] font-mono-data text-sm">
             NO ALERTS IN THIS CATEGORY
@@ -113,14 +130,14 @@ export default function Alerts() {
                 </div>
 
                 <div className="flex flex-col gap-2 flex-shrink-0">
-                  <button onClick={() => navigate(`/events/${alerts.find((a) => a.id === alert.id)?.eventId.replace('NTX-IND-00241', '1').replace('NTX-IND-00301', '4').replace('NTX-IND-00389', '12').replace('NTX-IND-00445', '10').replace('NTX-IND-00188', '5').replace('NTX-WLD-00078', '8') ?? '1'}`)}
+                  <button onClick={() => navigate(`/events/${alert.eventId}`)}
                     className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono-data text-[9px] tracking-widest px-3 py-1.5 hover:bg-cyan-500/20 transition-colors whitespace-nowrap">
                     INVESTIGATE
                   </button>
                   {alert.status === 'ACTIVE' && (
                     <button onClick={() => acknowledge(alert.id)}
                       className="bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono-data text-[9px] tracking-widest px-3 py-1.5 hover:bg-amber-500/20 transition-colors">
-                      ACKNOWLEDGE
+                      RESOLVE
                     </button>
                   )}
                 </div>

@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Flame, AlertTriangle, Building2, Activity, Eye, TrendingUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import IndiaMap from '../components/IndiaMap';
 import RiskBadge from '../components/RiskBadge';
-import { ALL_EVENTS, DASHBOARD_SUMMARY } from '../data/mockData';
+import { DASHBOARD_SUMMARY } from '../data/mockData';
+import { api, type MapFacilityFeature } from '../services/api';
+import { useAppStore } from '../store';
 import type { ThermalEvent } from '../types';
 
 const KPI = [
@@ -14,18 +16,6 @@ const KPI = [
   { label: 'Critical Events', value: DASHBOARD_SUMMARY.criticalEvents.toString(), sub: 'Risk score > 75', icon: AlertTriangle, accent: 'red' },
   { label: 'Persistent Sources', value: DASHBOARD_SUMMARY.persistentSources.toString(), sub: 'Recurring thermal activity', icon: Activity, accent: 'amber' },
 ];
-
-// Trend data
-const TREND = Array.from({ length: 14 }, (_, i) => {
-  const d = new Date('2026-09-04');
-  d.setDate(d.getDate() - (13 - i));
-  return {
-    date: d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
-    total: Math.round(800 + Math.random() * 400),
-    industrial: Math.round(40 + Math.random() * 30),
-    critical: Math.round(1 + Math.random() * 4),
-  };
-});
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -44,7 +34,54 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { events, eventsError } = useAppStore();
   const [selectedEvent, setSelectedEvent] = useState<ThermalEvent | null>(null);
+  const [summary, setSummary] = useState(DASHBOARD_SUMMARY);
+  const [mapEventIds, setMapEventIds] = useState<string[] | null>(null);
+  const [facilities, setFacilities] = useState<MapFacilityFeature[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([api.getDashboardSummary(), api.getMapEvents(), api.getMapFacilities()]).then(([nextSummary, mapEvents, mapFacilities]) => {
+      if (!active) return;
+      setSummary(nextSummary);
+      setMapEventIds(mapEvents.features.map((feature) => feature.properties.eventId));
+      setFacilities(mapFacilities.features);
+      setLoading(false);
+    }).catch(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const mapEvents = useMemo(() => {
+    if (!mapEventIds) return events;
+    const ids = new Set(mapEventIds);
+    return events.filter((event) => ids.has(event.eventId));
+  }, [events, mapEventIds]);
+
+  const trend = useMemo(() => {
+    const days = Array.from({ length: 14 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (13 - index));
+      const key = date.toISOString().slice(0, 10);
+      const dayEvents = events.filter((event) => event.acquisitionDate === key);
+      return {
+        date: date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+        total: dayEvents.length,
+        industrial: dayEvents.filter((event) => event.industrialProximity === 'HIGH' || event.industrialProximity === 'MEDIUM').length,
+        critical: dayEvents.filter((event) => event.riskLevel === 'CRITICAL').length,
+      };
+    });
+    return days;
+  }, [events]);
+
+  const riskDistribution = useMemo(() => (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).map((level) => ({
+    level,
+    count: events.filter((event) => event.riskLevel === level).length,
+    color: level === 'CRITICAL' ? '#ef4444' : level === 'HIGH' ? '#f97316' : level === 'MEDIUM' ? '#f59e0b' : '#22c55e',
+  })), [events]);
 
   const handleEventClick = (evt: ThermalEvent) => setSelectedEvent(evt);
 
@@ -89,7 +126,8 @@ export default function Dashboard() {
       <div className="flex-1 flex min-h-0">
         {/* Map */}
         <div className="flex-1 relative min-w-0">
-          <IndiaMap events={ALL_EVENTS} onEventClick={handleEventClick} selectedId={selectedEvent?.id} />
+          <IndiaMap events={mapEvents} facilities={facilities} onEventClick={handleEventClick} selectedId={selectedEvent?.eventId} />
+          {(loading || eventsError) && <div className="absolute top-3 left-3 glass px-3 py-1.5 font-mono-data text-[10px] text-amber-400">{loading ? 'SYNCING MAP DATA...' : 'DEMO MAP DATA ACTIVE'}</div>}
 
           {/* Event preview panel */}
           {selectedEvent && (
@@ -130,7 +168,7 @@ export default function Dashboard() {
                 </div>
 
                 <button
-                  onClick={() => navigate(`/events/${selectedEvent.id}`)}
+                  onClick={() => navigate(`/events/${selectedEvent.eventId}`)}
                   className="mt-3 w-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-display font-600 text-xs tracking-widest py-1.5 hover:bg-cyan-500/20 transition-colors"
                 >
                   INVESTIGATE EVENT →
@@ -146,7 +184,7 @@ export default function Dashboard() {
           <div className="p-4 border-b border-[#1e3a5f]">
             <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest mb-3">14-DAY EVENT TREND</div>
             <ResponsiveContainer width="100%" height={100}>
-              <AreaChart data={TREND} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
+              <AreaChart data={trend} margin={{ top: 0, right: 0, left: -30, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gTotal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.2} />
@@ -171,12 +209,12 @@ export default function Dashboard() {
           <div className="p-4 flex-1">
             <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest mb-3">CRITICAL & HIGH EVENTS</div>
             <div className="space-y-2">
-              {ALL_EVENTS.filter((e) => e.riskLevel === 'CRITICAL' || e.riskLevel === 'HIGH')
+              {events.filter((e) => e.riskLevel === 'CRITICAL' || e.riskLevel === 'HIGH')
                 .slice(0, 6)
                 .map((evt) => (
-                  <div key={evt.id}
+                  <div key={evt.eventId}
                     className="data-row p-2 border border-[#122035] cursor-pointer"
-                    onClick={() => navigate(`/events/${evt.id}`)}>
+                    onClick={() => navigate(`/events/${evt.eventId}`)}>
                     <div className="flex items-start justify-between gap-1 mb-1">
                       <span className="font-mono-data text-[10px] text-cyan-400">{evt.eventId}</span>
                       <RiskBadge level={evt.riskLevel} size="sm" />
@@ -194,19 +232,14 @@ export default function Dashboard() {
           {/* Risk distribution */}
           <div className="p-4 border-t border-[#1e3a5f]">
             <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest mb-3">RISK DISTRIBUTION</div>
-            {[
-              { level: 'CRITICAL', count: 12, color: '#ef4444' },
-              { level: 'HIGH', count: 35, color: '#f97316' },
-              { level: 'MEDIUM', count: 148, color: '#f59e0b' },
-              { level: 'LOW', count: 641, color: '#22c55e' },
-            ].map(({ level, count, color }) => (
+            {riskDistribution.map(({ level, count, color }) => (
               <div key={level} className="mb-2">
                 <div className="flex justify-between mb-0.5">
                   <span className="font-mono-data text-[9px] tracking-widest" style={{ color }}>{level}</span>
                   <span className="font-mono-data text-[9px] text-[#3d6490]">{count}</span>
                 </div>
                 <div className="h-1 bg-[#0a1628] w-full">
-                  <div className="h-full" style={{ width: `${(count / 836) * 100}%`, background: color, opacity: 0.7 }} />
+                  <div className="h-full" style={{ width: `${events.length ? (count / events.length) * 100 : 0}%`, background: color, opacity: 0.7 }} />
                 </div>
               </div>
             ))}

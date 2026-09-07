@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { ThermalEvent, RiskLevel } from '../types';
 import { ALL_EVENTS } from '../data/mockData';
+import { api } from '../services/api';
+
+const FALLBACK_EVENTS = ALL_EVENTS.map((event) => ({ ...event, id: event.eventId }));
 
 interface Filters {
   riskLevel: RiskLevel | 'ALL';
@@ -12,6 +15,10 @@ interface Filters {
 }
 
 interface AppState {
+  events: ThermalEvent[];
+  eventsLoading: boolean;
+  eventsError: string | null;
+  dataSource: 'backend' | 'demo-fallback';
   filters: Filters;
   selectedEventId: string | null;
   sidebarCollapsed: boolean;
@@ -19,6 +26,7 @@ interface AppState {
   resetFilters: () => void;
   setSelectedEvent: (id: string | null) => void;
   toggleSidebar: () => void;
+  loadEvents: () => Promise<void>;
   filteredEvents: () => ThermalEvent[];
 }
 
@@ -32,6 +40,10 @@ const defaultFilters: Filters = {
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
+  events: FALLBACK_EVENTS,
+  eventsLoading: true,
+  eventsError: null,
+  dataSource: 'demo-fallback',
   filters: defaultFilters,
   selectedEventId: null,
   sidebarCollapsed: false,
@@ -45,9 +57,24 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
+  loadEvents: async () => {
+    set({ eventsLoading: true, eventsError: null });
+    try {
+      const events = await api.getAllEvents();
+      set({ events, eventsLoading: false, dataSource: 'backend' });
+    } catch (error) {
+      set({
+        events: FALLBACK_EVENTS,
+        eventsLoading: false,
+        dataSource: 'demo-fallback',
+        eventsError: error instanceof Error ? error.message : 'Backend unavailable. Showing demo data.',
+      });
+    }
+  },
+
   filteredEvents: () => {
     const { filters } = get();
-    return ALL_EVENTS.filter((e) => {
+    return get().events.filter((e) => {
       if (filters.riskLevel !== 'ALL' && e.riskLevel !== filters.riskLevel) return false;
       if (filters.classification !== 'ALL' && e.classification !== filters.classification) return false;
       if (filters.state !== 'ALL' && e.state !== filters.state) return false;

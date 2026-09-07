@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import RiskBadge from '../components/RiskBadge';
 import { ALL_EVENTS } from '../data/mockData';
+import { api } from '../services/api';
+import { useAppStore } from '../store';
+import type { ThermalEvent } from '../types';
 
-const SORTED = [...ALL_EVENTS].sort((a, b) => b.riskScore - a.riskScore);
+const FALLBACK_SORTED = [...ALL_EVENTS].map((event) => ({ ...event, id: event.eventId })).sort((a, b) => b.riskScore - a.riskScore);
 
 const ACTION_COLOR: Record<string, string> = {
   'Immediate': '#ef4444',
@@ -26,8 +29,22 @@ export default function PriorityCenter() {
   const [sortField, setSortField] = useState<'riskScore' | 'confidence' | 'zScore'>('riskScore');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const [filterRisk, setFilterRisk] = useState('ALL');
+  const fallbackEvents = useAppStore((state) => state.events);
+  const [events, setEvents] = useState<ThermalEvent[]>(fallbackEvents);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const sorted = [...SORTED]
+  useEffect(() => {
+    let active = true;
+    void api.getPriority().then((response) => {
+      if (active) { setEvents(response.items); setLoading(false); }
+    }).catch(() => {
+      if (active) { setEvents(fallbackEvents.length ? fallbackEvents : FALLBACK_SORTED); setError(true); setLoading(false); }
+    });
+    return () => { active = false; };
+  }, [fallbackEvents]);
+
+  const sorted = [...events]
     .filter((e) => filterRisk === 'ALL' || e.riskLevel === filterRisk)
     .sort((a, b) => {
       const diff = (a[sortField] as number) - (b[sortField] as number);
@@ -51,6 +68,8 @@ export default function PriorityCenter() {
           RANKED THERMAL EVENTS REQUIRING OPERATOR ATTENTION · {sorted.length} EVENTS
         </div>
       </div>
+      {error && <div className="px-5 py-2 border-b border-amber-800/40 bg-amber-950/20 font-mono-data text-[10px] text-amber-400">BACKEND UNAVAILABLE · DEMO DATA ACTIVE</div>}
+      {loading && <div className="px-5 py-2 font-mono-data text-[10px] text-cyan-400">SYNCING PRIORITY QUEUE...</div>}
 
       {/* Filters */}
       <div className="flex items-center gap-3 px-5 py-2 border-b border-[#1e3a5f] flex-shrink-0">
@@ -93,9 +112,9 @@ export default function PriorityCenter() {
           </thead>
           <tbody>
             {sorted.map((evt, idx) => (
-              <tr key={evt.id}
+              <tr key={evt.eventId}
                 className="data-row border-b border-[#0d1f3c] cursor-pointer"
-                onClick={() => navigate(`/events/${evt.id}`)}>
+                onClick={() => navigate(`/events/${evt.eventId}`)}>
                 <td className="px-3 py-2.5 font-mono-data text-[#3d6490] text-[10px]">{String(idx + 1).padStart(2, '0')}</td>
                 <td className="px-3 py-2.5 font-mono-data text-cyan-400 text-[10px] whitespace-nowrap">{evt.eventId}</td>
                 <td className="px-3 py-2.5 font-display font-500 text-[11px] text-[#e2eaf5] whitespace-nowrap">{evt.classification}</td>
@@ -114,6 +133,7 @@ export default function PriorityCenter() {
             ))}
           </tbody>
         </table>
+        {!loading && sorted.length === 0 && <div className="p-6 text-center font-mono-data text-xs text-[#3d6490]">NO PRIORITY EVENTS</div>}
       </div>
     </div>
   );

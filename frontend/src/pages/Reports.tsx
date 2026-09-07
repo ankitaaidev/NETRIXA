@@ -1,19 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileText, Download, CheckCircle } from 'lucide-react';
 import RiskBadge from '../components/RiskBadge';
 import { ALL_EVENTS } from '../data/mockData';
+import { api } from '../services/api';
+import type { ThermalEvent } from '../types';
 
 export default function Reports() {
   const [selectedId, setSelectedId] = useState('');
+  const [events, setEvents] = useState<ThermalEvent[]>(ALL_EVENTS.map((event) => ({ ...event, id: event.eventId })));
   const [generated, setGenerated] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<Awaited<ReturnType<typeof api.generateReport>> | null>(null);
 
-  const event = ALL_EVENTS.find((e) => e.id === selectedId);
+  const event = events.find((e) => e.eventId === selectedId);
+
+  useEffect(() => {
+    let active = true;
+    void api.getAllEvents().then((nextEvents) => {
+      if (active) { setEvents(nextEvents); setLoading(false); }
+    }).catch(() => {
+      if (active) { setError('BACKEND UNAVAILABLE · DEMO DATA ACTIVE'); setLoading(false); }
+    });
+    return () => { active = false; };
+  }, []);
 
   const generate = () => {
+    if (!selectedId) return;
     setGenerating(true);
     setGenerated(false);
-    setTimeout(() => { setGenerating(false); setGenerated(true); }, 1200);
+    setError(null);
+    void api.generateReport(selectedId).then((nextReport) => {
+      setReport(nextReport);
+      setGenerating(false);
+      setGenerated(true);
+    }).catch((requestError) => {
+      setGenerating(false);
+      setError(requestError instanceof Error ? requestError.message : 'REPORT GENERATION FAILED');
+    });
   };
 
   return (
@@ -22,6 +47,7 @@ export default function Reports() {
         <div className="font-display font-700 text-xl tracking-[0.1em] text-[#e2eaf5]">INCIDENT REPORTS</div>
         <div className="font-mono-data text-[10px] text-[#3d6490] tracking-widest">GENERATE STRUCTURED INTELLIGENCE REPORTS FOR THERMAL EVENTS</div>
       </div>
+      {error && <div className="px-5 py-2 border-b border-amber-800/40 bg-amber-950/20 font-mono-data text-[10px] text-amber-400">{error}</div>}
 
       <div className="flex-1 overflow-auto p-5">
         <div className="max-w-3xl space-y-4">
@@ -32,8 +58,8 @@ export default function Reports() {
               <select value={selectedId} onChange={(e) => { setSelectedId(e.target.value); setGenerated(false); }}
                 className="flex-1 bg-[#050a14] border border-[#1e3a5f] text-[#e2eaf5] text-xs font-mono-data px-3 py-2 focus:outline-none focus:border-cyan-500/50">
                 <option value="">— Select Thermal Event —</option>
-                {ALL_EVENTS.map((e) => (
-                  <option key={e.id} value={e.id}>{e.eventId} · {e.classification} · {e.riskLevel}</option>
+                {events.map((e) => (
+                  <option key={e.eventId} value={e.eventId}>{e.eventId} · {e.classification} · {e.riskLevel}</option>
                 ))}
               </select>
               <button
@@ -46,7 +72,8 @@ export default function Reports() {
           </div>
 
           {/* Report preview */}
-          {generated && event && (
+          {loading && <div className="font-mono-data text-[10px] text-cyan-400">LOADING REPORT EVENTS...</div>}
+          {generated && event && report && (
             <div className="bg-[#0a1628] border border-[#1e3a5f]">
               {/* Report header */}
               <div className="px-6 py-4 border-b border-[#1e3a5f] flex items-start justify-between"
@@ -57,7 +84,7 @@ export default function Reports() {
                   <div className="font-display text-sm text-[#7a9cc4] mt-0.5">{event.classification}</div>
                   <div className="flex items-center gap-2 mt-2">
                     <RiskBadge level={event.riskLevel} size="sm" />
-                    <span className="font-mono-data text-[10px] text-[#3d6490]">Generated: 2026-09-04 · DEMO PROTOTYPE</span>
+                    <span className="font-mono-data text-[10px] text-[#3d6490]">Generated: {new Date(report.generatedAt).toLocaleString('en-IN')}</span>
                   </div>
                 </div>
                 <button className="flex items-center gap-1.5 bg-[#050a14] border border-[#1e3a5f] text-[#7a9cc4] font-mono-data text-[10px] px-3 py-2 hover:text-[#e2eaf5] transition-colors">
@@ -140,7 +167,7 @@ export default function Reports() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-2 text-[9px] text-[#3d6490]">* PROTOTYPE — Classification is indicative. Not production-validated. Model output intended for human review.</p>
+                  <p className="mt-2 text-[9px] text-[#3d6490]">* {report.disclaimer}</p>
                 </section>
 
                 {/* Recommended action */}

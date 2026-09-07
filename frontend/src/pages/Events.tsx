@@ -13,7 +13,7 @@ const STATES = ['ALL', 'West Bengal', 'Gujarat', 'Maharashtra', 'Madhya Pradesh'
 
 export default function Events() {
   const navigate = useNavigate();
-  const { filters, setFilter, resetFilters, filteredEvents } = useAppStore();
+  const { filters, setFilter, resetFilters, filteredEvents, eventsLoading, eventsError } = useAppStore();
   const events = filteredEvents();
 
   return (
@@ -30,6 +30,8 @@ export default function Events() {
           <X size={12} /> RESET FILTERS
         </button>
       </div>
+
+      {eventsError && <div className="px-5 py-2 border-b border-amber-800/40 bg-amber-950/20 font-mono-data text-[10px] text-amber-400">BACKEND UNAVAILABLE · DEMO DATA ACTIVE</div>}
 
       {/* Filters */}
       <div className="flex items-center gap-3 px-5 py-2.5 border-b border-[#1e3a5f] bg-[#050a14] flex-shrink-0 flex-wrap">
@@ -66,6 +68,7 @@ export default function Events() {
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
+        {eventsLoading && <div className="px-5 py-3 font-mono-data text-[10px] text-cyan-400">SYNCING THERMAL EVENTS...</div>}
         <table className="w-full border-collapse text-xs">
           <thead className="sticky top-0 z-10 bg-[#050a14]">
             <tr className="border-b border-[#1e3a5f]">
@@ -78,9 +81,9 @@ export default function Events() {
           </thead>
           <tbody>
             {events.map((evt) => (
-              <tr key={evt.id}
+              <tr key={evt.eventId}
                 className="data-row border-b border-[#0d1f3c] cursor-pointer"
-                onClick={() => navigate(`/events/${evt.id}`)}>
+                onClick={() => navigate(`/events/${evt.eventId}`)}>
                 <td className="px-3 py-2.5 font-mono-data text-cyan-400 text-[10px] whitespace-nowrap">{evt.eventId}</td>
                 <td className="px-3 py-2.5 font-display font-500 text-[#e2eaf5] text-[11px] whitespace-nowrap">{evt.classification}</td>
                 <td className="px-3 py-2.5 whitespace-nowrap"><RiskBadge level={evt.riskLevel} size="sm" /></td>
@@ -105,6 +108,7 @@ export default function Events() {
             ))}
           </tbody>
         </table>
+        {!eventsLoading && events.length === 0 && <div className="p-6 text-center font-mono-data text-xs text-[#3d6490]">NO EVENTS MATCH CURRENT FILTERS</div>}
       </div>
     </div>
   );

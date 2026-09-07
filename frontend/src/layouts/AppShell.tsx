@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -39,9 +39,13 @@ const STATUS = [
 ];
 
 export default function AppShell() {
-  const { sidebarCollapsed, toggleSidebar, filters, setFilter } = useAppStore();
+  const { sidebarCollapsed, toggleSidebar, filters, setFilter, loadEvents, events, dataSource } = useAppStore();
   const navigate = useNavigate();
   const [searchVal, setSearchVal] = useState("");
+
+  useEffect(() => {
+    void loadEvents();
+  }, [loadEvents]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,9 +192,13 @@ export default function AppShell() {
             <div className="hidden md:flex items-center gap-2">
               <Activity size={12} className="text-green-400" />
               <span className="font-mono-data text-[10px] text-[#7a9cc4]">
-                12,482 EVENTS
+                {events.length.toLocaleString()} EVENTS
               </span>
             </div>
+
+            {dataSource === "demo-fallback" && (
+              <span className="hidden xl:inline font-mono-data text-[9px] text-amber-400">DEMO DATA</span>
+            )}
             <div className="hidden md:flex items-center gap-2">
               <Database size={12} className="text-cyan-400" />
               <span className="font-mono-data text-[10px] text-[#7a9cc4]">

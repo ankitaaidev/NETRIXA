@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ThermalEvent } from "../types";
+import type { MapFacilityFeature } from "../services/api";
 import RiskBadge from "./RiskBadge";
 
 // Approximate India bounding box: lat 8–37, lon 68–98
@@ -31,9 +32,10 @@ interface Props {
   events: ThermalEvent[];
   onEventClick: (event: ThermalEvent) => void;
   selectedId?: string | null;
+  facilities?: MapFacilityFeature[];
 }
 
-export default function IndiaMap({ events, onEventClick, selectedId }: Props) {
+export default function IndiaMap({ events, onEventClick, selectedId, facilities = [] }: Props) {
   const [tooltip, setTooltip] = useState<{
     event: ThermalEvent;
     x: number;
@@ -100,22 +102,12 @@ export default function IndiaMap({ events, onEventClick, selectedId }: Props) {
         />
 
         {/* Facility markers */}
-        {[
-          { lat: 21.18, lon: 72.81 },
-          { lat: 22.57, lon: 88.36 },
-          { lat: 18.98, lon: 79.53 },
-          { lat: 20.31, lon: 85.86 },
-          { lat: 22.09, lon: 85.83 },
-          { lat: 17.69, lon: 83.22 },
-          { lat: 13.08, lon: 80.27 },
-          { lat: 19.08, lon: 72.88 },
-          { lat: 24.06, lon: 82.66 },
-          { lat: 22.42, lon: 70.05 },
-        ].map((f, i) => {
-          const { x, y } = toXY(f.lat, f.lon);
+        {facilities.map((facility) => {
+          const [lon, lat] = facility.geometry.coordinates;
+          const { x, y } = toXY(lat, lon);
           return (
             <rect
-              key={i}
+              key={facility.properties.facilityId}
               x={x - 3}
               y={y - 3}
               width={6}
