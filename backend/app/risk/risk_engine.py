@@ -104,7 +104,7 @@ def compute_risk(
     settings = get_settings()
 
     relevance = INDUSTRIAL_RELEVANCE.get(classification, 0.7)
-    raw_thermal_anomaly = _clamp01(abs(z_score) / 4.0)
+    raw_thermal_anomaly = _clamp01(max(z_score, 0.0) / 4.0)
     thermal_anomaly_score = raw_thermal_anomaly * relevance
     historical_deviation_score = thermal_anomaly_score  # same basis, see module docstring
     proximity_value = PROXIMITY_VALUE.get(proximity, 0.0)
