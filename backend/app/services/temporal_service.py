@@ -70,10 +70,17 @@ def analyze_history(
     reference = baseline if len(baseline) >= 5 else observations_sorted
     historical_mean = sum(o.intensity for o in reference) / len(reference)
     variance = sum((o.intensity - historical_mean) ** 2 for o in reference) / len(reference)
-    historical_std = max(variance ** 0.5, EPSILON)
+    historical_std = variance ** 0.5
 
     current_deviation = current_value - historical_mean
-    z_score = current_deviation / historical_std
+
+    # A z-score is not statistically meaningful when the historical
+    # baseline has no variation. Keep the actual deviation, but neutralize
+    # the z-score so it cannot create a false anomaly.
+    if historical_std <= EPSILON:
+        z_score = 0.0
+    else:
+        z_score = current_deviation / historical_std
 
     recurrence_rate = len(anomalies) / n
 
