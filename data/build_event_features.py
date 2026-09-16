@@ -2,7 +2,7 @@ import geopandas as gpd
 import pandas as pd
 
 FIRMS_FILE = "data/processed/thermal_events.csv"
-OSM_FILE = "data/raw/osm/kolkata_industrial_facilities.geojson"
+OSM_FILE = "data/raw/osm/india_facilities/india_facilities.geojson"
 OUTPUT_FILE = "data/processed/event_features.csv"
 
 print("Loading FIRMS data...")
@@ -22,26 +22,31 @@ firms_gdf = gpd.GeoDataFrame(
 )
 
 # Keep useful OSM information
-osm["facility_type"] = (
-    osm["industrial"]
-    .fillna(osm["power"])
-    .fillna(osm["man_made"])
-    .fillna("unknown")
-)
-
+# Keep useful OSM information
+# Keep useful OSM information
 osm["facility_name"] = osm["name"].fillna("Unnamed facility")
 
 osm = osm[
     [
-        "id",
+        "osm_id",
+        "osm_role",
         "facility_name",
         "facility_type",
-        "power",
-        "man_made",
-        "industrial",
+        "osm_power",
+        "osm_man_made",
+        "osm_industrial",
         "geometry",
     ]
 ].copy()
+
+# Rename columns to simple names for feature engineering
+osm = osm.rename(columns={
+    "osm_id": "facility_id",
+    "osm_role": "role",
+    "osm_power": "power",
+    "osm_man_made": "man_made",
+    "osm_industrial": "industrial",
+})
 
 # Project both datasets to a metric CRS.
 # EPSG:3857 gives distances in meters.
@@ -85,6 +90,7 @@ feature_columns = [
     "facility_id",
     "facility_name",
     "facility_type",
+    "role",
     "power",
     "man_made",
     "industrial",

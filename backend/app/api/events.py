@@ -22,7 +22,7 @@ router = APIRouter()
 def list_events(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
-    pageSize: int = Query(25, ge=1, le=200),
+    pageSize: int = Query(25, ge=1, le=2000),
     state: str | None = None,
     district: str | None = None,
     classification: str | None = None,
@@ -72,7 +72,64 @@ def list_events(
     items = [serialize_event(evt, analysis) for evt, analysis in page_rows]
     return PaginatedEventsOut(items=items, total=total, page=page, pageSize=pageSize)
 
+@router.get("/events/historical-risk-trend")
+def historical_risk_trend(db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(ThermalEvent.detection_time, EventAnalysis.risk_level)
+        .join(
+            EventAnalysis,
+            EventAnalysis.event_id == ThermalEvent.event_id,
+            isouter=True,
+        )
+        .where(EventAnalysis.risk_level.isnot(None))
+        .order_by(ThermalEvent.detection_time)
+    ).all()
 
+    if not rows:
+        return []
+
+    latest_date = max(row[0].date() for row in rows)
+    start_date = latest_date - timedelta(days=29)
+
+    daily = {}
+
+    for detection_time, risk_level in rows:
+        event_date = detection_time.date()
+
+        if event_date < start_date or event_date > latest_date:
+            continue
+
+        if event_date not in daily:
+            daily[event_date] = {
+                "date": event_date.isoformat(),
+                "low": 0,
+                "medium": 0,
+                "high": 0,
+                "critical": 0,
+            }
+
+        level = risk_level.value.lower()
+
+        if level in daily[event_date]:
+            daily[event_date][level] += 1
+
+    result = []
+
+    for offset in range(30):
+        current_date = start_date + timedelta(days=offset)
+
+        if current_date in daily:
+            result.append(daily[current_date])
+        else:
+            result.append({
+                "date": current_date.isoformat(),
+                "low": 0,
+                "medium": 0,
+                "high": 0,
+                "critical": 0,
+            })
+
+    return result
 @router.get("/events/{event_id}", response_model=ThermalEventOut)
 def get_event(event_id: str, db: Session = Depends(get_db)):
     event = db.get(ThermalEvent, event_id)
@@ -101,6 +158,7 @@ def get_event_history(event_id: str, db: Session = Depends(get_db)):
         {"date": o.obs_date.strftime("%Y-%m-%d"), "intensity": o.intensity, "frp": o.frp, "isAnomaly": o.is_anomaly}
         for o in observations
     ]
+
 
 
 @router.post("/events/{event_id}/analyze", response_model=ThermalEventOut)

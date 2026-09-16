@@ -58,19 +58,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   loadEvents: async () => {
-    set({ eventsLoading: true, eventsError: null });
-    try {
-      const events = await api.getAllEvents();
-      set({ events, eventsLoading: false, dataSource: 'backend' });
-    } catch (error) {
-      set({
-        events: FALLBACK_EVENTS,
-        eventsLoading: false,
-        dataSource: 'demo-fallback',
-        eventsError: error instanceof Error ? error.message : 'Backend unavailable. Showing demo data.',
-      });
-    }
-  },
+  set({ eventsLoading: true, eventsError: null });
+  try {
+    const eventsResponse = await api.getAllEvents();
+    set({
+      events: eventsResponse.items,
+      eventsLoading: false,
+      dataSource: 'backend',
+    });
+  } catch (error) {
+    set({
+      events: FALLBACK_EVENTS,
+      eventsLoading: false,
+      dataSource: 'demo-fallback',
+      eventsError:
+        error instanceof Error
+          ? error.message
+          : 'Backend unavailable. Showing demo data.',
+    });
+  }
+},
 
   filteredEvents: () => {
     const { filters } = get();

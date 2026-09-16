@@ -73,9 +73,9 @@ INDUSTRIAL_RELEVANCE = {
 
 RECOMMENDED_ACTIONS = {
     RiskLevel.CRITICAL: "Immediate investigation required — dispatch field verification.",
-    RiskLevel.HIGH: "Verify within 24 hours — elevated deviation from historical baseline.",
-    RiskLevel.MEDIUM: "Monitor — schedule routine review.",
-    RiskLevel.LOW: "Observe — no immediate action required.",
+    RiskLevel.HIGH: "Verify within 24 hours - elevated deviation from historical baseline.",
+    RiskLevel.MEDIUM: "Monitor - schedule routine review.",
+    RiskLevel.LOW: "Observe - no immediate action required.",
 }
 
 _AGRICULTURAL_LOW_ACTION = "No immediate action — consistent with expected agricultural burning pattern."

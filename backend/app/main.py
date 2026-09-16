@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -11,11 +13,27 @@ from app.core.config import get_settings
 settings = get_settings()
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+from app.services.live_firms import live_firms_loop
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    live_task = asyncio.create_task(live_firms_loop())
+
+    try:
+        yield
+    finally:
+        live_task.cancel()
+
+        try:
+            await live_task
+        except asyncio.CancelledError:
+            pass
 app = FastAPI(
     title="NETRIXA API",
     description="AI-Powered Thermal Intelligence & Early-Warning System — SIH 2026 (PS #26162)",
     version="0.1.0",
+    lifespan=lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

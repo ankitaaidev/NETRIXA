@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.geospatial.facility_proximity import nearest_facility
-from app.geospatial.land_cover import resolve_land_cover
+from app.geospatial.land_cover import resolve_land_cover, reverse_geocode_state
 from app.ml.classifier import ClassifierFeatures, ThermalClassifier
 from app.models.alert import Alert
 from app.models.enums import AlertStatus, ProximityLevel, RiskLevel
@@ -37,6 +37,8 @@ def process_event(db: Session, event: ThermalEvent) -> EventAnalysis:
     """Runs one event through the full pipeline and upserts its
     event_analysis row. Does not commit — caller controls the transaction."""
     match = nearest_facility(db, event.latitude, event.longitude)
+    if not event.state:
+       event.state = reverse_geocode_state(event.latitude, event.longitude)
     lc = resolve_land_cover(
         event.land_cover, event.latitude, event.longitude,
         match.distance_m if match else None,
@@ -138,12 +140,13 @@ def _sync_alert_for_event(db: Session, event: ThermalEvent, analysis: EventAnaly
         alert_id=alert_id,
         event_id=event.event_id,
         severity=analysis.risk_level,
-        title=f"{analysis.classification.value} detected — {analysis.risk_level.value} risk",
+        title=f"{analysis.classification.value} detected - {analysis.risk_level.value} risk",
         message=(
-            f"Thermal anomaly at {event.state}, {event.district} classified as "
-            f"{analysis.classification.value} with a risk score of {analysis.risk_score}/100. "
-            f"{'Nearest facility: ' + analysis.facility_name + '.' if analysis.facility_name else ''}"
-        ),
+        f"Thermal anomaly at {event.latitude:.4f} N, {event.longitude:.4f} E "
+        f"classified as {analysis.classification.value} with a risk score of "
+        f"{analysis.risk_score}/100. "
+        f"{'Nearest facility: ' + analysis.facility_name + '.' if analysis.facility_name else ''}"
+    ),
         status=AlertStatus.ACTIVE,
         recommended_action=analysis.recommended_action,
     ))

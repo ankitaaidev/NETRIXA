@@ -43,3 +43,11 @@ dist/
 build/
 .coverage
 htmlcov/
+
+# Large OSM extraction data
+data/raw/osm/india_extracts/
+data/raw/osm/india_facilities/
+data/raw/osm/relation_inspection_eastern.txt
+
+data/raw/firms/live_firms.csv
+data/processed/live_firms_india.csv

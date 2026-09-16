@@ -132,11 +132,15 @@ def analyze_history(
         persistence_score = _clamp01(0.5 + min(abs(z_score) / 10, 0.35))
         spatial_change = SpatialChangeLevel.HIGH
         spatial_change_score = _clamp01(0.5 + min(abs(z_score) / 10, 0.35))
-    elif 0.0 < recurrence_rate < 0.15 or (anomalies and current_streak < 10):
+    elif len(anomalies) >= 2 and recurrence_rate < 0.15:
         persistence = PersistenceType.INTERMITTENT
-        persistence_score = _clamp01(0.3 + min(abs(z_score) / 10, 0.25))
+        persistence_score = _clamp01(
+            0.3 + min(max(z_score, 0.0) / 10, 0.25)
+        )
         spatial_change = SpatialChangeLevel.MEDIUM
-        spatial_change_score = _clamp01(0.3 + min(abs(z_score) / 10, 0.25))
+        spatial_change_score = _clamp01(
+            0.3 + min(max(z_score, 0.0) / 10, 0.25)
+        )
     else:
         persistence = PersistenceType.UNKNOWN
         persistence_score = 0.4
