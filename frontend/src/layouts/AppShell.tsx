@@ -19,6 +19,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useAppStore } from "../store";
+import { api } from "../services/api";
 
 const NAV = [
   { to: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -35,16 +36,46 @@ const STATUS = [
   { label: "GIS ENGINE", status: "ONLINE" },
   { label: "AI ENGINE", status: "ONLINE" },
   { label: "DATABASE", status: "ONLINE" },
-  { label: "SATELLITE FEED", status: "DEMO" },
+  { label: "FIRMS FEED", status: "ONLINE" },
 ];
 
 export default function AppShell() {
-  const { sidebarCollapsed, toggleSidebar, filters, setFilter, loadEvents, events, dataSource } = useAppStore();
+  const {
+    sidebarCollapsed,
+    toggleSidebar,
+    filters,
+    setFilter,
+    loadEvents,
+    events,
+    dataSource,
+  } = useAppStore();
   const navigate = useNavigate();
   const [searchVal, setSearchVal] = useState("");
+  const [totalEventCount, setTotalEventCount] = useState(0);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   useEffect(() => {
     void loadEvents();
+
+    const loadTotalEventCount = async () => {
+      try {
+        const summary = await api.getDashboardSummary();
+        setTotalEventCount(summary.totalEvents);
+        setLastSyncAt(summary.lastSyncAt);
+      } catch {
+        // Keep the existing value if the request fails.
+      }
+    };
+
+    void loadTotalEventCount();
+
+    const interval = window.setInterval(() => {
+      void loadTotalEventCount();
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [loadEvents]);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -71,7 +102,7 @@ export default function AppShell() {
                   NETRIXA
                 </div>
                 <div className="font-mono-data text-[8px] text-[#3d6490] tracking-[0.2em] mt-0.5">
-                  THERMAL INTEL
+                  THERMAL INTELLIGENCE
                 </div>
               </div>
             </>
@@ -121,14 +152,6 @@ export default function AppShell() {
                 </span>
               </div>
             ))}
-            <div className="mt-2 pt-2 border-t border-[#122035]">
-              <div className="font-mono-data text-[9px] text-[#3d6490]">
-                LAST SYNC
-              </div>
-              <div className="font-mono-data text-[9px] text-[#7a9cc4]">
-                2026-09-04 · 03:50 UTC
-              </div>
-            </div>
           </div>
         )}
 
@@ -168,7 +191,7 @@ export default function AppShell() {
           <div className="hidden lg:flex items-center gap-1.5 border border-amber-800/40 bg-amber-950/20 px-2 py-1 rounded-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
             <span className="font-mono-data text-[9px] text-amber-400 tracking-widest">
-              DEMO ENVIRONMENT
+              LIVE MONITORING
             </span>
           </div>
 
@@ -192,12 +215,32 @@ export default function AppShell() {
             <div className="hidden md:flex items-center gap-2">
               <Activity size={12} className="text-green-400" />
               <span className="font-mono-data text-[10px] text-[#7a9cc4]">
-                {events.length.toLocaleString()} EVENTS
+                {totalEventCount.toLocaleString()} EVENTS
+              </span>
+            </div>
+            <div className="hidden lg:flex flex-col leading-tight">
+              <span className="font-mono-data text-[8px] text-[#3d6490] tracking-wider">
+                LAST FIRMS SYNC
+              </span>
+              <span className="font-mono-data text-[9px] text-[#7a9cc4]">
+                {lastSyncAt
+                  ? new Date(lastSyncAt).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                      timeZone: "Asia/Kolkata",
+                    }) + " IST"
+                  : "NOT SYNCED"}
               </span>
             </div>
 
             {dataSource === "demo-fallback" && (
-              <span className="hidden xl:inline font-mono-data text-[9px] text-amber-400">DEMO DATA</span>
+              <span className="hidden xl:inline font-mono-data text-[9px] text-amber-400">
+                DEMO DATA
+              </span>
             )}
             <div className="hidden md:flex items-center gap-2">
               <Database size={12} className="text-cyan-400" />
@@ -214,22 +257,6 @@ export default function AppShell() {
               <Bell size={16} />
               <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-[#050a14]" />
             </NavLink>
-
-            {/* Operator */}
-            <div className="flex items-center gap-2 pl-3 border-l border-[#1e3a5f]">
-              <div className="w-7 h-7 bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center">
-                <span className="font-mono-data text-[10px] text-cyan-400">
-                  OP
-                </span>
-              </div>
-              {!sidebarCollapsed && (
-                <div className="hidden lg:block">
-                  <div className="font-display font-600 text-xs text-[#e2eaf5] tracking-wide">
-                    OPERATOR 01
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </header>
 

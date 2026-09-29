@@ -55,11 +55,33 @@ class ClassificationResult:
 
 
 SOFTMAX_TEMPERATURE = 1.6
+def _is_industrial_context(f: ClassifierFeatures) -> bool:
+    """
+    Returns True when the land-cover and facility evidence together
+    support an industrial context.
+
+    ESA WorldCover has a generic "Built-up" class, not an "Industrial"
+    class. Therefore Built-up is treated as industrial context only when
+    a known industrial facility is within medium/high proximity.
+    """
+    if f.land_cover == "Industrial":
+        return True
+
+    if (
+        f.land_cover == "Built-up"
+        and f.facility_proximity in (
+            ProximityLevel.HIGH,
+            ProximityLevel.MEDIUM,
+        )
+    ):
+        return True
+
+    return False
 
 
 def _score_potential_industrial_fire(f: ClassifierFeatures) -> float:
-    if f.land_cover != "Industrial":
-        return 0.0
+    if not _is_industrial_context(f):
+      return 0.0
     score = 0.0
     if f.facility_proximity in (ProximityLevel.HIGH, ProximityLevel.MEDIUM):
         score += 1.0
@@ -74,8 +96,8 @@ def _score_potential_industrial_fire(f: ClassifierFeatures) -> float:
 
 
 def _score_industrial_fire(f: ClassifierFeatures) -> float:
-    if f.land_cover != "Industrial":
-        return 0.0
+    if not _is_industrial_context(f):
+      return 0.0
     score = 0.0
     if f.facility_proximity in (ProximityLevel.HIGH, ProximityLevel.MEDIUM):
         score += 1.0
@@ -88,8 +110,8 @@ def _score_industrial_fire(f: ClassifierFeatures) -> float:
 
 
 def _score_persistent_industrial(f: ClassifierFeatures) -> float:
-    if f.land_cover != "Industrial":
-        return 0.0
+    if not _is_industrial_context(f):
+      return 0.0
     score = 0.0
     if f.facility_proximity in (ProximityLevel.HIGH, ProximityLevel.MEDIUM):
         score += 1.0
@@ -103,8 +125,8 @@ def _score_persistent_industrial(f: ClassifierFeatures) -> float:
 
 
 def _score_gas_flare(f: ClassifierFeatures) -> float:
-    if f.land_cover != "Industrial":
-        return 0.0
+    if not _is_industrial_context(f):
+      return 0.0
     score = 0.0
     if f.facility_proximity in (ProximityLevel.HIGH, ProximityLevel.MEDIUM):
         score += 1.0

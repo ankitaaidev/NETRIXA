@@ -43,6 +43,7 @@ def process_event(db: Session, event: ThermalEvent) -> EventAnalysis:
         event.land_cover, event.latitude, event.longitude,
         match.distance_m if match else None,
     )
+    event.land_cover = lc["land_cover"]
     observations = db.execute(
         select(HistoricalObservation).where(HistoricalObservation.event_id == event.event_id)
     ).scalars().all()

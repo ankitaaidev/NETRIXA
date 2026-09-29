@@ -17,6 +17,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.database.session import session_scope
 from app.models.thermal_event import ThermalEvent
+from app.models.sync_status import SyncStatus
 from app.services.pipeline import process_event
 
 
@@ -283,6 +284,22 @@ def sync_once() -> dict:
             db,
         )
 
+        sync_status = db.get(
+            SyncStatus,
+            "FIRMS",
+        )
+
+        if sync_status is None:
+            sync_status = SyncStatus(
+                source="FIRMS",
+                last_success_at=datetime.now(timezone.utc),
+                status="ONLINE",
+            )
+            db.add(sync_status)
+        else:
+            sync_status.last_success_at = datetime.now(timezone.utc)
+            sync_status.status = "ONLINE"
+
     result = {
         "fetched": len(combined),
         "india": len(india_df),
@@ -293,7 +310,6 @@ def sync_once() -> dict:
         "FIRMS sync:",
         result,
     )
-
 
     return result
 async def live_firms_loop():

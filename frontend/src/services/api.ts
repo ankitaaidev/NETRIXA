@@ -24,7 +24,15 @@ export const api = {
 
   getMapEvents: () => request("/api/map/events"),
 
-  getMapFacilities: () => request("/api/map/facilities"),
+  getMapFacilities: (
+    minLon: number,
+    minLat: number,
+    maxLon: number,
+    maxLat: number,
+  ) =>
+    request(
+      `/api/map/facilities?min_lon=${minLon}&min_lat=${minLat}&max_lon=${maxLon}&max_lat=${maxLat}`,
+    ),
 
   // Events
   getAllEvents: () => request("/api/events?page=1&pageSize=2000"),

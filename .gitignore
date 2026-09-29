@@ -51,3 +51,12 @@ data/raw/osm/relation_inspection_eastern.txt
 
 data/raw/firms/live_firms.csv
 data/processed/live_firms_india.csv
+# ESA WorldCover local dataset
+data/raw/land_cover/
+
+# Local WorldCover / validation files
+check_worldcover.py
+esa-worldcover-datasets/
+
+# Local database backup
+netrixa_backup_before_worldcover.sql

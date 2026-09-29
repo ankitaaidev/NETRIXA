@@ -9,6 +9,7 @@ from slowapi.util import get_remote_address
 
 from app.api import alerts, dashboard, events, facilities, health, map as map_api, priority, reports
 from app.core.config import get_settings
+from fastapi.middleware.cors import CORSMiddleware
 
 settings = get_settings()
 
@@ -34,6 +35,16 @@ app = FastAPI(
     description="AI-Powered Thermal Intelligence & Early-Warning System — SIH 2026 (PS #26162)",
     version="0.1.0",
     lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:8443",
+        "http://127.0.0.1:8443",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

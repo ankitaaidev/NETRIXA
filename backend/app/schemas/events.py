@@ -9,7 +9,7 @@ existing frontend, and any naming mismatch would force a translation
 layer we specifically want to avoid.
 """
 from pydantic import BaseModel, Field
-
+from datetime import datetime
 
 class ExplanationFactorOut(BaseModel):
     factor: str
@@ -97,6 +97,7 @@ class DashboardSummaryOut(BaseModel):
     potentialIndustrialFires: int
     criticalEvents: int
     persistentSources: int
+    lastSyncAt: datetime | None = None
 
 
 class PaginatedEventsOut(BaseModel):

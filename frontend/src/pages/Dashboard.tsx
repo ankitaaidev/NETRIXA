@@ -63,6 +63,12 @@ export default function Dashboard() {
   const [mapEventIds, setMapEventIds] = useState<string[] | null>(null);
   const [facilities, setFacilities] = useState<MapFacilityFeature[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mapBounds, setMapBounds] = useState({
+    minLon: 68,
+    minLat: 6,
+    maxLon: 98,
+    maxLat: 36,
+  });
   const KPI = [
     {
       label: "Total Thermal Events",
@@ -108,10 +114,9 @@ export default function Dashboard() {
       try {
         await loadEvents();
 
-        const [nextSummary, mapEvents, mapFacilities] = await Promise.all([
+        const [nextSummary, mapEvents] = await Promise.all([
           api.getDashboardSummary(),
           api.getMapEvents(),
-          api.getMapFacilities(),
         ]);
 
         if (!active) return;
@@ -122,7 +127,6 @@ export default function Dashboard() {
           mapEvents.features.map((feature) => feature.properties.eventId),
         );
 
-        setFacilities(mapFacilities.features);
         setLoading(false);
       } catch {
         if (active) {
@@ -144,6 +148,33 @@ export default function Dashboard() {
       window.clearInterval(interval);
     };
   }, [loadEvents]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadMapFacilities = async () => {
+      try {
+        const mapFacilities = await api.getMapFacilities(
+          mapBounds.minLon,
+          mapBounds.minLat,
+          mapBounds.maxLon,
+          mapBounds.maxLat,
+        );
+
+        if (!active) return;
+
+        setFacilities(mapFacilities.features);
+      } catch {
+        // Keep the existing facility data if the map request fails.
+      }
+    };
+
+    void loadMapFacilities();
+
+    return () => {
+      active = false;
+    };
+  }, [mapBounds.minLon, mapBounds.minLat, mapBounds.maxLon, mapBounds.maxLat]);
   console.log("Dashboard events:", events.length);
   console.log("Map event IDs:", mapEventIds?.length);
   const mapEvents = useMemo(() => {
@@ -258,9 +289,11 @@ export default function Dashboard() {
         <div className="flex-1 relative min-w-0">
           <IndiaMap
             events={mapEvents}
+            totalEventCount={summary.totalEvents}
             facilities={facilities}
             onEventClick={handleEventClick}
             selectedId={selectedEvent?.eventId}
+            onBoundsChange={setMapBounds}
           />
           {(loading || eventsError) && (
             <div className="absolute top-3 left-3 glass px-3 py-1.5 font-mono-data text-[10px] text-amber-400">

@@ -5,7 +5,7 @@ from app.models.event_analysis import EventAnalysis  # noqa: F401
 from app.models.facility import Facility  # noqa: F401
 from app.models.historical_observation import HistoricalObservation  # noqa: F401
 from app.models.thermal_event import ThermalEvent  # noqa: F401
-
+from app.models.sync_status import SyncStatus
 __all__ = [
     "Base",
     "Alert",

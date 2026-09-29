@@ -1,64 +1,233 @@
 """
-Land-cover context and administrative-region lookup.
+Real land-cover lookup using ESA WorldCover 2021 v200.
 
-LIMITATION (documented, not hidden): this prototype has no access to a
-real land-cover raster (e.g. ESA WorldCover) or official administrative
-boundary shapefiles — those require downloads from data portals outside
-this environment's allowed network domains. Instead:
+WorldCover tiles are 3° x 3° GeoTIFFs in EPSG:4326 at approximately
+10 m resolution.
 
-- land_cover_context() uses a simple, explainable heuristic: proximity to
-  a known industrial facility, membership in a known forest-belt anchor
-  region, or a rough agricultural-belt state bounding box.
-- reverse_geocode_state() uses the same rough rectangular state bounding
-  boxes as the Phase 4 seed data (app.geospatial.regions.STATE_BOUNDS).
-
-Both are clearly labeled as approximations in their return values so the
-API layer (Phase 9) can pass that caveat through rather than presenting
-them as authoritative.
+The raster provides the actual land-cover observation. Industrial
+classification is NOT inferred from the WorldCover "Built-up" class alone.
+A nearby industrial facility is used as additional evidence.
 """
-from math import asin, cos, radians, sin, sqrt
 
-from app.geospatial.regions import FOREST_REGIONS, STATE_BOUNDS
+from pathlib import Path
+from math import floor
 
-AGRICULTURAL_BELT_STATES = {"Punjab", "Haryana", "Bihar", "Madhya Pradesh", "Uttar Pradesh", "West Bengal"}
+import rasterio
 
-FOREST_PROXIMITY_DEG = 0.7  # ~75km at these latitudes, generous for a rough anchor-based heuristic
-
-
-def _haversine_km(lat1, lon1, lat2, lon2) -> float:
-    lat1, lon1, lat2, lon2 = map(radians, (lat1, lon1, lat2, lon2))
-    dlat, dlon = lat2 - lat1, lon2 - lon1
-    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
-    return 2 * 6371 * asin(sqrt(a))
+from app.geospatial.regions import STATE_BOUNDS
 
 
-def reverse_geocode_state(latitude: float, longitude: float) -> str | None:
-    """Rough bounding-box based state lookup. Returns None if the point
-    doesn't fall within any known state's bounding box (e.g. ocean, or a
-    state not in our reference list)."""
-    for state, (lat_min, lat_max, lon_min, lon_max) in STATE_BOUNDS.items():
-        if lat_min <= latitude <= lat_max and lon_min <= longitude <= lon_max:
+# C:\NETRIXA\data\raw\land_cover\worldcover_2021
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+WORLD_COVER_DIR = (
+    PROJECT_ROOT / "data" / "raw" / "land_cover" / "worldcover_2021"
+)
+
+
+# ESA WorldCover 2021 class codes.
+WORLDCOVER_CLASSES = {
+    10: "Tree cover",
+    20: "Shrubland",
+    30: "Grassland",
+    40: "Cropland",
+    50: "Built-up",
+    60: "Bare/sparse vegetation",
+    70: "Snow and ice",
+    80: "Permanent water bodies",
+    90: "Herbaceous wetland",
+    95: "Mangroves",
+    100: "Moss and lichen",
+}
+
+
+def _tile_name(latitude: float, longitude: float) -> str:
+    """
+    Return the ESA WorldCover 3° x 3° tile containing the point.
+
+    Example:
+        latitude=22.5, longitude=88.3
+        -> N21E087
+    """
+
+    lat_origin = floor(latitude / 3) * 3
+    lon_origin = floor(longitude / 3) * 3
+
+    if lat_origin >= 0:
+        lat_part = f"N{lat_origin:02d}"
+    else:
+        lat_part = f"S{abs(lat_origin):02d}"
+
+    if lon_origin >= 0:
+        lon_part = f"E{lon_origin:03d}"
+    else:
+        lon_part = f"W{abs(lon_origin):03d}"
+
+    return f"{lat_part}{lon_part}"
+
+
+def _tile_path(latitude: float, longitude: float) -> Path:
+    tile = _tile_name(latitude, longitude)
+
+    return WORLD_COVER_DIR / (
+        f"ESA_WorldCover_10m_2021_v200_{tile}_Map.tif"
+    )
+
+
+def _worldcover_class(
+    latitude: float,
+    longitude: float,
+) -> tuple[int | None, str | None]:
+    """
+    Read the WorldCover class at one latitude/longitude.
+
+    Returns:
+        (class_code, class_name)
+
+    Returns (None, None) when the required tile is unavailable or the
+    coordinate cannot be read.
+    """
+
+    path = _tile_path(latitude, longitude)
+
+    if not path.exists():
+        return None, None
+
+    try:
+        with rasterio.open(path) as src:
+            value = next(src.sample([(longitude, latitude)]))[0]
+
+            if src.nodata is not None and value == src.nodata:
+                return None, None
+
+            class_code = int(value)
+            class_name = WORLDCOVER_CLASSES.get(
+                class_code,
+                "Unknown",
+            )
+
+            return class_code, class_name
+
+    except Exception:
+        return None, None
+
+
+def reverse_geocode_state(
+    latitude: float,
+    longitude: float,
+) -> str | None:
+    """
+    Rough state lookup using the existing reference bounding boxes.
+    """
+
+    for state, (
+        lat_min,
+        lat_max,
+        lon_min,
+        lon_max,
+    ) in STATE_BOUNDS.items():
+
+        if (
+            lat_min <= latitude <= lat_max
+            and lon_min <= longitude <= lon_max
+        ):
             return state
+
     return None
 
 
-def land_cover_context(latitude: float, longitude: float, nearest_facility_distance_m: float | None) -> dict:
+def _map_worldcover_to_classifier(
+    class_code: int,
+    class_name: str,
+    nearest_facility_distance_m: float | None,
+) -> str:
     """
-    Returns {"land_cover": str, "basis": str} — `basis` documents WHY this
-    label was chosen, since it's a heuristic rather than a measured value.
+    Convert ESA WorldCover into NETRIXA's land-cover vocabulary.
+
+    Built-up remains "Built-up" because WorldCover does not distinguish
+    industrial from residential/commercial built-up land. Industrial
+    context is determined separately using OSM facility proximity.
     """
-    if nearest_facility_distance_m is not None and nearest_facility_distance_m <= 2000:
-        return {"land_cover": "Industrial", "basis": "within 2km of a known industrial facility"}
 
-    for state, f_lat, f_lon, _district in FOREST_REGIONS:
-        if abs(latitude - f_lat) <= FOREST_PROXIMITY_DEG and abs(longitude - f_lon) <= FOREST_PROXIMITY_DEG:
-            return {"land_cover": "Forest", "basis": f"within known forest-belt anchor near {state}"}
+    if class_code == 10:
+        return "Forest"
 
-    state = reverse_geocode_state(latitude, longitude)
-    if state in AGRICULTURAL_BELT_STATES:
-        return {"land_cover": "Cropland", "basis": f"within {state}'s agricultural-belt bounding region"}
+    if class_code == 40:
+        return "Cropland"
 
-    return {"land_cover": "Mixed/Unclassified", "basis": "no strong land-cover signal from available heuristics"}
+    if class_code == 50:
+        return "Built-up"
+
+    if class_code == 60:
+        return "Barren/Mining"
+
+    if class_code == 95:
+        return "Forest"
+
+    return "Mixed/Unclassified"
+    """
+    Convert the real ESA WorldCover class into the existing NETRIXA
+    classifier's land-cover vocabulary.
+
+    WorldCover itself does not have an "Industrial" class. Built-up
+    land is therefore considered Industrial only when a known industrial
+    facility is also nearby.
+    """
+
+    if class_code == 40:
+        return "Cropland"
+
+    if class_code in (10, 95):
+        return "Forest"
+
+    if class_code == 60:
+        return "Barren/Mining"
+
+    if (
+        class_code == 50
+        and nearest_facility_distance_m is not None
+        and nearest_facility_distance_m <= 2000
+    ):
+        return "Industrial"
+
+    return "Mixed/Unclassified"
+
+
+def land_cover_context(
+    latitude: float,
+    longitude: float,
+    nearest_facility_distance_m: float | None,
+) -> dict:
+    """
+    Get actual land-cover information from ESA WorldCover.
+
+    The returned land_cover value remains compatible with the existing
+    NETRIXA classifier.
+    """
+
+    class_code, class_name = _worldcover_class(
+        latitude,
+        longitude,
+    )
+
+    if class_code is None:
+        return {
+            "land_cover": "Mixed/Unclassified",
+            "basis": "ESA WorldCover tile unavailable or unreadable",
+        }
+
+    classifier_label = _map_worldcover_to_classifier(
+        class_code,
+        class_name,
+        nearest_facility_distance_m,
+    )
+
+    return {
+        "land_cover": classifier_label,
+        "basis": (
+            f"ESA WorldCover 2021 v200, "
+            f"class {class_code} ({class_name})"
+        ),
+    }
 
 
 def resolve_land_cover(
@@ -68,14 +237,39 @@ def resolve_land_cover(
     nearest_facility_distance_m: float | None,
 ) -> dict:
     """
-    Prefer already-known land cover (e.g. set directly by Phase 4's demo
-    seed, or in production by whatever ingestion pipeline attached it)
-    over the coarse heuristic above. The heuristic in land_cover_context()
-    exists specifically for the case where we DON'T already know the
-    answer — e.g. freshly ingested live FIRMS points (Phase 12) that
-    haven't been enriched yet. Re-deriving a coarser guess when a better
-    answer is already on hand would silently throw away information.
+    Resolve land cover from ESA WorldCover first.
+
+    Previously stored land-cover values are used only when the WorldCover
+    tile is unavailable or unreadable.
     """
+
+    class_code, class_name = _worldcover_class(
+        latitude,
+        longitude,
+    )
+
+    if class_code is not None:
+        classifier_label = _map_worldcover_to_classifier(
+            class_code,
+            class_name,
+            nearest_facility_distance_m,
+        )
+
+        return {
+            "land_cover": classifier_label,
+            "basis": (
+                f"ESA WorldCover 2021 v200, "
+                f"class {class_code} ({class_name})"
+            ),
+        }
+
     if known_land_cover:
-        return {"land_cover": known_land_cover, "basis": "known from source data"}
-    return land_cover_context(latitude, longitude, nearest_facility_distance_m)
+        return {
+            "land_cover": known_land_cover,
+            "basis": "fallback to previously known source value",
+        }
+
+    return {
+        "land_cover": "Mixed/Unclassified",
+        "basis": "ESA WorldCover tile unavailable or unreadable",
+    }

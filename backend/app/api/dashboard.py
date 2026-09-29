@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.enums import ClassificationType, ProximityLevel, RiskLevel, PersistenceType
 from app.models.event_analysis import EventAnalysis
+from app.models.sync_status import SyncStatus
 from app.models.thermal_event import ThermalEvent
 from app.schemas.events import DashboardSummaryOut
 
@@ -34,11 +35,19 @@ def dashboard_summary(db: Session = Depends(get_db)):
     persistent_sources = db.execute(
         select(func.count(EventAnalysis.id)).where(EventAnalysis.persistence == PersistenceType.NORMAL_PERSISTENT)
     ).scalar() or 0
-
+    sync_status = db.get(
+        SyncStatus,
+        "FIRMS",
+    )
     return DashboardSummaryOut(
         totalEvents=total_events,
         industrialEvents=industrial_events,
         potentialIndustrialFires=potential_industrial_fires,
         criticalEvents=critical_events,
         persistentSources=persistent_sources,
+        lastSyncAt=(
+            sync_status.last_success_at
+            if sync_status
+            else None
+        ),
     )

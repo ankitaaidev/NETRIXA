@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -34,8 +34,27 @@ def map_events(db: Session = Depends(get_db)):
 
 
 @router.get("/map/facilities")
-def map_facilities(db: Session = Depends(get_db)):
-    facilities = db.execute(select(Facility)).scalars().all()
+def map_facilities(
+    min_lon: float,
+    min_lat: float,
+    max_lon: float,
+    max_lat: float,
+    db: Session = Depends(get_db),
+):
+    envelope = func.ST_MakeEnvelope(
+        min_lon,
+        min_lat,
+        max_lon,
+        max_lat,
+        4326,
+    )
+
+    facilities = db.execute(
+        select(Facility).where(
+            func.ST_Intersects(Facility.geom, envelope)
+        )
+    ).scalars().all()
+
     features = [
         point_feature(f.longitude, f.latitude, {
             "id": f.facility_id,
@@ -47,4 +66,5 @@ def map_facilities(db: Session = Depends(get_db)):
         })
         for f in facilities
     ]
+
     return feature_collection(features)
